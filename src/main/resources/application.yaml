@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: ms-pedidos
+  config:
+    import: configserver:http://localhost:8888
+  cloud:
+    config:
+      uri: http://localhost:8888
+      username: ${CONFIG_USERNAME:admin}
+      password: ${CONFIG_PASSWORD:config123}
+  profiles:
+    active: dev
