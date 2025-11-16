@@ -1,120 +1,70 @@
 # MS Pedidos
 
-Microservicio de gestión de pedidos del Sistema de Gestión de Pedidos.
+Microservicio reactivo para gestión de pedidos con arquitectura event-driven y estados.
 
-## Descripción
-
-API REST para gestión completa de pedidos con integración al microservicio de productos. Implementa validación de stock, cálculo de totales y comunicación entre servicios.
-
-## Tecnologías
-
-- **Java**: 21
-- **Spring Boot**: 3.3.3
-- **WebFlux**: Programación reactiva
-- **R2DBC**: Base de datos reactiva
-- **PostgreSQL**: Base de datos
-- **Maven**: Gestor de dependencias
-
-## Base de Datos
-
-### Tablas
-```sql
--- Pedidos
-CREATE TABLE pedidos (
-    id BIGSERIAL PRIMARY KEY,
-    cliente VARCHAR(255) NOT NULL,
-    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    total DECIMAL(10,2) DEFAULT 0,
-    estado VARCHAR(50) DEFAULT 'PENDIENTE'
-);
-
--- Detalles de pedido
-CREATE TABLE detalle_pedidos (
-    id BIGSERIAL PRIMARY KEY,
-    pedido_id BIGINT NOT NULL,
-    producto_id BIGINT NOT NULL,
-    cantidad INTEGER NOT NULL,
-    precio_unitario DECIMAL(10,2) NOT NULL,
-    FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
-);
-```
-
-## Configuración
-
-### Variables de Entorno
-- `DB_URL`: URL PostgreSQL (r2dbc:postgresql://...)
-- `DB_USERNAME`: Usuario BD
-- `DB_PASSWORD`: Contraseña BD
-- `MS_PRODUCTOS_URL`: URL del microservicio productos
-
-### Perfiles
-- **dev**: Desarrollo (puerto 8082)
-- **qa**: QA (puerto 8082)
-- **prd**: Producción (puerto 8082)
-
-## Ejecución
-
-```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
-```
-
-## API Endpoints
-
-| Método | Endpoint | Descripción |
-|--------|----------|-------------|
-| GET | `/api/pedidos` | Listar pedidos |
-| GET | `/api/pedidos/{id}` | Obtener pedido |
-| POST | `/api/pedidos` | Crear pedido |
-| PUT | `/api/pedidos/{id}/estado` | Actualizar estado |
-| DELETE | `/api/pedidos/{id}` | Eliminar pedido |
-| GET | `/api/pedidos/buscar/cliente` | Buscar por cliente |
-| GET | `/api/pedidos/buscar/estado` | Buscar por estado |
+- **Arquitectura Reactiva**: Programación reactiva con Spring WebFlux
+- **Event-Driven**: Consume eventos de productos via Kafka
+- **Base de Datos Reactiva**: R2DBC con PostgreSQL
+- **Service Discovery**: Registro automático en Eureka
+- **Estados de Pedido**: Gestión completa del ciclo de vida
 
 ## Funcionalidades
 
-### Validación de Stock
-- Verifica disponibilidad antes de crear pedido
-- Actualiza stock automáticamente al crear pedido
-- Devuelve stock al cancelar pedido
-
-### Cálculo Automático
-- Calcula totales basado en productos
-- Aplica precios unitarios actuales
+### Gestión de Pedidos
+- **Crear**: Registro de nuevos pedidos con validación
+- **Consultar**: Búsqueda por ID y listado completo
+- **Actualizar**: Modificación de estados de pedido
+- **Eliminar**: Cancelación de pedidos
 
 ### Estados de Pedido
-- **PENDIENTE**: Pedido creado
-- **PROCESADO**: Pedido completado
+- **PENDIENTE**: Pedido creado, esperando confirmación
+- **CONFIRMADO**: Pedido confirmado por el sistema
+- **ENVIADO**: Pedido en proceso de envío
+- **ENTREGADO**: Pedido entregado al cliente
 - **CANCELADO**: Pedido cancelado
 
-## Ejemplos
+### Integración
+- **MS Productos**: Validación de stock y precios
+- **Kafka**: Consumir eventos de productos
 
-### Crear pedido
+## Dependencias
+
+### Base de Datos
+- **PostgreSQL**: Base de datos reactiva con R2DBC
+- **Base de datos**: `db_pedidos_dev`, `db_pedidos_qa`, `db_pedidos_prod`
+- **Script**: Ejecutar `database/script.sql`
+
+### Servicios de Infraestructura
+- **Registry Service**: http://localhost:8761 (Eureka)
+- **Config Server**: http://localhost:8888
+- **Kafka**: Event streaming platform
+- **Gateway**: API Gateway en puerto 8080
+- **MS Productos**: Validación de productos
+
+### API REST - Pedidos
+
+#### GET /api/pedidos
+Obtener todos los pedidos
 ```bash
-POST /api/pedidos
-{
-  "cliente": "Juan Pérez",
-  "detalles": [
-    {
-      "productoId": 1,
-      "cantidad": 2
-    }
-  ]
-}
+curl http://localhost:8080/api/pedidos
 ```
 
-### Actualizar estado
+#### GET /api/pedidos/{id}
+Obtener pedido por ID
 ```bash
-PUT /api/pedidos/1/estado?estado=PROCESADO
+curl http://localhost:8080/api/pedidos/1
 ```
 
-### Buscar por cliente
+#### POST /api/pedidos
+Crear nuevo pedido
 ```bash
-GET /api/pedidos/buscar/cliente?cliente=Juan
+curl -X POST http://localhost:8080/api/pedidos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cliente": {"nombre": "Juan Pérez", "email": "juan@email.com"},
+    "direccionEntrega": {"calle": "Av. Principal 123", "ciudad": "Lima"},
+    "detalles": [
+      {"productoId": 1, "cantidad": 2, "precioUnitario": 1299.99}
+    ]
+  }'
 ```
-
-## 🔗 Integración
-
-Requiere que `ms-productos` esté ejecutándose para:
-- Validar stock disponible
-- Obtener precios actualizados
-- Actualizar inventario

@@ -1,0 +1,11 @@
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\client\ProductoClient.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\config\SecurityConfig.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\dto\ProductoDTO.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\entity\DetallePedido.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\entity\Pedido.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\handler\PedidoHandler.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\MsPedidosApplication.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\repository\DetallePedidoRepository.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\repository\PedidoRepository.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\router\PedidoRouter.java
+D:\Sistema de Gestión de Pedidos con Microservicios\ms-pedidos\src\main\java\com\example\ms_pedidos\service\PedidoService.java

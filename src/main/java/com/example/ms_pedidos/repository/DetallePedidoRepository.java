@@ -1,13 +1,9 @@
 package com.example.ms_pedidos.repository;
 
-import com.example.ms_pedidos.entity.DetallePedido;
-import org.springframework.data.r2dbc.repository.R2dbcRepository;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+import com.example.ms_pedidos.entities.DetallePedido;
+import org.springframework.data.repository.reactive.ReactiveCrudRepository;
+import org.springframework.stereotype.Repository;
 
-public interface DetallePedidoRepository extends R2dbcRepository<DetallePedido, Long> {
-
-    Flux<DetallePedido> findByPedidoId(Long pedidoId);
-
-    Mono<Void> deleteByPedidoId(Long pedidoId);
+@Repository
+public interface DetallePedidoRepository extends ReactiveCrudRepository<DetallePedido, Long> {
 }

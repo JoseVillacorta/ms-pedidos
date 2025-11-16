@@ -1,115 +1,75 @@
 package com.example.ms_pedidos.service;
 
-import com.example.ms_pedidos.client.ProductoClient;
-import com.example.ms_pedidos.dto.ProductoDTO;
-import com.example.ms_pedidos.entity.DetallePedido;
-import com.example.ms_pedidos.entity.Pedido;
+import com.example.ms_pedidos.entities.DetallePedido;
+import com.example.ms_pedidos.entities.Pedido;
 import com.example.ms_pedidos.repository.DetallePedidoRepository;
 import com.example.ms_pedidos.repository.PedidoRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class PedidoService {
+    private final PedidoRepository repository;
+    private final DetallePedidoRepository detalleRepository;
+    private final ProductoService productoService;
 
-    private final PedidoRepository pedidoRepository;
-    private final DetallePedidoRepository detallePedidoRepository;
-    private final ProductoClient productoClient;
-
-    public Flux<Pedido> obtenerTodos() {
-        return pedidoRepository.findAll();
+    public PedidoService(PedidoRepository repository, DetallePedidoRepository detalleRepository, ProductoService productoService) {
+        this.repository = repository;
+        this.detalleRepository = detalleRepository;
+        this.productoService = productoService;
     }
 
-    public Mono<Pedido> obtenerPorId(Long id) {
-        return pedidoRepository.findById(id);
+    public Flux<Pedido> findAll() {
+        return repository.findAll();
     }
 
-    public Mono<Pedido> crear(Pedido pedido) {
-        pedido.setFecha(LocalDateTime.now());
-        pedido.setEstado("PENDIENTE");
-        pedido.setTotal(BigDecimal.ZERO);
+    public Mono<Pedido> findById(Long id) {
+        return repository.findById(id);
+    }
 
-        // Calcular total y validar stock
-        return validarYCalcularTotal(pedido.getDetalles())
-                .flatMap(total -> {
+    public Mono<Pedido> save(Pedido pedido) {
+        // Validación y cálculo igual
+        return Flux.fromIterable(pedido.getDetalles())
+                .flatMap(detalle -> productoService.obtenerProducto(detalle.getProductoId())
+                        .doOnNext(producto -> {
+                            Integer stock = (Integer) producto.get("stock");
+                            Double precio = (Double) producto.get("precio");
+                            if (stock < detalle.getCantidad()) {
+                                throw new RuntimeException("Stock insuficiente");
+                            }
+                            detalle.setPrecioUnitario(precio);
+                        }))
+                .then(Mono.fromCallable(() -> {
+                    double total = pedido.getDetalles().stream()
+                            .mapToDouble(d -> d.getCantidad() * d.getPrecioUnitario())
+                            .sum();
                     pedido.setTotal(total);
-                    return pedidoRepository.save(pedido);
+                    pedido.setEstado("PENDIENTE");
+                    return pedido;
+                }))
+                .flatMap(repository::save)
+                .flatMap(savedPedido -> {
+                    // Setear pedidoId y guardar detalles
+                    savedPedido.getDetalles().forEach(d -> d.setPedidoId(savedPedido.getId()));
+                    return detalleRepository.saveAll(savedPedido.getDetalles())
+                            .then(Mono.just(savedPedido));
                 })
-                .flatMap(pedidoGuardado -> {
-                    // Guardar detalles
-                    List<DetallePedido> detalles = pedido.getDetalles();
-                    detalles.forEach(detalle -> detalle.setPedidoId(pedidoGuardado.getId()));
+                .doOnNext(saved -> Flux.fromIterable(saved.getDetalles())
+                        .flatMap(detalle -> productoService.actualizarStock(detalle.getProductoId(), -detalle.getCantidad()))
+                        .subscribe());
 
-                    return Flux.fromIterable(detalles)
-                            .flatMap(detallePedidoRepository::save)
-                            .then(Mono.just(pedidoGuardado));
-                })
-                .flatMap(pedidoGuardado -> {
-                    // Actualizar stock de productos
-                    return Flux.fromIterable(pedido.getDetalles())
-                            .flatMap(detalle ->
-                                    productoClient.actualizarStock(detalle.getProductoId(), -detalle.getCantidad())
-                            )
-                            .then(Mono.just(pedidoGuardado));
-                });
     }
 
-    private Mono<BigDecimal> validarYCalcularTotal(List<DetallePedido> detalles) {
-        return Flux.fromIterable(detalles)
-                .flatMap(detalle ->
-                        productoClient.obtenerProducto(detalle.getProductoId())
-                                .map(producto -> {
-                                    // Validar stock disponible
-                                    if (producto.getStock() < detalle.getCantidad()) {
-                                        throw new RuntimeException("Stock insuficiente para producto: " + producto.getNombre());
-                                    }
-                                    // Calcular precio
-                                    detalle.setPrecioUnitario(producto.getPrecio());
-                                    return detalle.getPrecioUnitario().multiply(BigDecimal.valueOf(detalle.getCantidad()));
-                                })
-                )
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    public Mono<Pedido> actualizarEstado(Long id, String estado) {
-        return pedidoRepository.findById(id)
+    public Mono<Pedido> updateEstado(Long id, String estado) {
+        return repository.findById(id)
                 .flatMap(pedido -> {
                     pedido.setEstado(estado);
-                    return pedidoRepository.save(pedido);
+                    return repository.save(pedido);
                 });
     }
 
-    public Mono<Boolean> eliminar(Long id) {
-        return pedidoRepository.findById(id)
-                .flatMap(pedido -> {
-                    // Solo permitir eliminar pedidos PENDIENTES
-                    if (!"PENDIENTE".equals(pedido.getEstado())) {
-                        return Mono.just(false);
-                    }
-
-                    // Devolver stock a productos
-                    return Flux.fromIterable(pedido.getDetalles())
-                            .flatMap(detalle ->
-                                    productoClient.actualizarStock(detalle.getProductoId(), detalle.getCantidad())
-                            )
-                            .then(detallePedidoRepository.deleteByPedidoId(id))
-                            .then(pedidoRepository.deleteById(id))
-                            .then(Mono.just(true));
-                })
-                .defaultIfEmpty(false);
-    }
-
-    public Flux<Pedido> obtenerPorCliente(String cliente) {
-        return pedidoRepository.findByCliente(cliente);
-    }
-
-    public Flux<Pedido> obtenerPorEstado(String estado) {
-        return pedidoRepository.findByEstado(estado);
+    public Mono<Void> delete(Long id) {
+        return repository.deleteById(id);
     }
 }
